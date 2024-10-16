@@ -1,0 +1,44 @@
+version: "3"
+
+services:
+  cassandra:
+    image: cassandra:4.0.6
+    # # If there are more than two Cassandra nodes, these two configurations will fail.
+    # container_name: cassandra
+    # ports:
+    #   - "9042:9042"  # Cassandra port
+    environment:
+      CASSANDRA_CLUSTER_NAME: "JanusGraph Cluster"
+      CASSANDRA_SEEDS: cassandra
+    deploy:
+      replicas: 1  # Set the number of replicas for scaling
+      restart_policy:
+        condition: on-failure
+    volumes:
+      - cassandra_data:/var/lib/cassandra  # Persisting Cassandra data
+
+  janusgraph:
+    image: janusgraph/janusgraph:1.0.0
+    container_name: janusgraph
+    ports:
+      - "8182:8182"  # JanusGraph Gremlin Server port
+    depends_on:
+      - cassandra
+    environment:
+      STORAGE_BACKEND: "cassandra"
+      STORAGE_HOSTS: "cassandra"
+      INDEX_BACKEND: "elasticsearch"  # Optional, for using Elasticsearch
+      ELASTICSEARCH_HOSTS: "elasticsearch:9200"  # Optional
+    volumes:
+      - "./docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d"  # Mounting initialization scripts
+
+  elasticsearch:
+    image: elasticsearch:8.10.4
+    container_name: elasticsearch
+    environment:
+      discovery.type: "single-node"
+    ports:
+      - "9200:9200"  # Elasticsearch port
+
+volumes:
+  cassandra_data:  # Defining the volume for Cassandra
