@@ -171,3 +171,67 @@ spec:
     name: gremlin-server
   selector:
     app: janusgraph
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: janusgraph-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: janusgraph.mydatabase.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: janusgraph
+            port:
+              number: 8182
+  - host: elasticsearch.mydatabase.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: elasticsearch
+            port:
+              number: 9200
+  - host: cassandra.mydatabase.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: cassandra
+            port:
+              number: 9042
+  - host: mydatabase.com
+    http:
+      paths:
+      - path: /janusgraph
+        pathType: Prefix
+        backend:
+          service:
+            name: janusgraph
+            port:
+              number: 8182
+      - path: /elasticsearch
+        pathType: Prefix
+        backend:
+          service:
+            name: elasticsearch
+            port:
+              number: 9200
+      - path: /cassandra
+        pathType: Prefix
+        backend:
+          service:
+            name: cassandra
+            port:
+              number: 9042

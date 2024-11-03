@@ -23,12 +23,26 @@ This "Hello World" project demonstrates how to set up JanusGraph with a Cassandr
 
    > **Note**: The tunnel command must be kept running in a separate terminal while you are working with the services.
 
-2. **Deploy the JanusGraph, Cassandra, and Elasticsearch Stack**
-   With the Minikube tunnel running, open a new terminal tab or window and deploy the required Kubernetes resources:
+
+2. **Deploy Kubernets resources**
 
    ```bash
-   kubectl apply -f janusgraph-cassandra-elasticsearch.yaml
+   ./database.sh  --setup --update-host
    ```
+   Run the following command to check the ingress-nginx Namespace and ensure the controller Pod is running.
+
+   ```bash
+   kubectl get pods -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx
+   ```
+   ```bash
+   NAME                                       READY   STATUS      RESTARTS   AGE
+   ingress-nginx-admission-create-78jjl       0/1     Completed   0          84s
+   ingress-nginx-admission-patch-cc9pr        0/1     Completed   0          84s
+   ingress-nginx-controller-79fcc99b4-qn69k   1/1     Running     0          84s
+   ```
+   
+   Don’t worry about the Completed Pods. These were short-lived Pods that initialized the environment.
+   Once the controller Pod is running, you have an NGINX Ingress controller and are ready to create some Ingress objects.
 
 3. **Verify Pods are Running**
    After deploying, check that all pods are up and running:
@@ -48,15 +62,6 @@ This "Hello World" project demonstrates how to set up JanusGraph with a Cassandr
 
    Ensure each pod status is "Running." If not, refer to the troubleshooting section below.
 
-4. **Access Services Locally**
-   To access the JanusGraph, Elasticsearch, and Cassandra services locally, use the following port-forwarding commands in a separate terminal window:
-
-   ```bash
-   kubectl port-forward service/janusgraph 8182:8182 &
-   kubectl port-forward service/elasticsearch 9200:9200 &
-   kubectl port-forward service/cassandra 9042:9042 &
-   ```
-
 5. **Run the .NET Application**
    Navigate to the `MyJanusGraphApp` project directory and build and run the C# application:
 
@@ -72,7 +77,7 @@ This "Hello World" project demonstrates how to set up JanusGraph with a Cassandr
    To delete the resources when finished, run:
 
    ```bash
-   kubectl delete -f janusgraph-cassandra-elasticsearch.yaml
+   ./database.sh  --cleanup
    ```
 
 ## Troubleshooting
