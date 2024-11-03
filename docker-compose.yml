@@ -1,4 +1,4 @@
-version: "3"
+version: "3.8"
 
 services:
   cassandra:
@@ -9,13 +9,21 @@ services:
     #   - "9042:9042"  # Cassandra port
     environment:
       CASSANDRA_CLUSTER_NAME: "JanusGraph Cluster"
-      CASSANDRA_SEEDS: cassandra
+      CASSANDRA_SEEDS: "cassandra"  # Docker Swarm service discovery automatically uses the service name
+      # CASSANDRA_BROADCAST_ADDRESS: "{{.Node.Hostname}}"  # Dynamic broadcast address based on node
+      # CASSANDRA_LISTEN_ADDRESS: "{{.Node.Hostname}}"  # Dynamic listen address based on node
+      # CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
     deploy:
       replicas: 1  # Set the number of replicas for scaling
       restart_policy:
         condition: on-failure
+      # placement:
+      #   constraints:
+      #     - node.role == worker  # Run Cassandra nodes only on worker nodes
     volumes:
       - cassandra_data:/var/lib/cassandra  # Persisting Cassandra data
+    # networks:
+    #   - cassandra_net
 
   janusgraph:
     image: janusgraph/janusgraph:1.0.0
@@ -30,6 +38,7 @@ services:
       INDEX_BACKEND: "elasticsearch"  # Optional, for using Elasticsearch
       ELASTICSEARCH_HOSTS: "elasticsearch:9200"  # Optional
     volumes:
+      - janusgraph_data:/var/lib/janusgraph  # Persisting JanusGraph data
       - "./docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d"  # Mounting initialization scripts
 
   elasticsearch:
@@ -39,6 +48,14 @@ services:
       discovery.type: "single-node"
     ports:
       - "9200:9200"  # Elasticsearch port
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data  # Persisting Elasticsearch data
 
 volumes:
   cassandra_data:  # Defining the volume for Cassandra
+  janusgraph_data:  # Defining the volume for JanusGraph
+  elasticsearch_data:  # Defining the volume for Elasticsearch
+
+# networks:
+#   cassandra_net:
+#     external: true  # Use the external overlay network
