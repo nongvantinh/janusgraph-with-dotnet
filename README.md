@@ -1,66 +1,122 @@
-Testing Interaction Between .NET and JanusGraph
+For docker compose example, please see branch 1.0:
 
-This "Hello World" project is meant to demonstrate how to start JanusGraph with a Cassandra backend and Elasticsearch in a Docker environment, then connect to it using the C# GremlinClient.
+---
 
-### Running the Setup
+# Testing Interaction Between .NET and JanusGraph
 
-1. **Open a Terminal:**
-   Make sure you have a terminal or command prompt open and navigate to the root directory of this project where the `docker-compose.yml` file is located.
+This "Hello World" project demonstrates how to set up JanusGraph with a Cassandra backend and Elasticsearch in a Kubernetes environment, then connect to it using the C# GremlinClient.
 
-2. **Start the Containers:**
-   Run the following command to start the Docker containers in detached mode:
+## Prerequisites
+- **Minikube**: Installed and running.
+- **Kubernetes CLI (kubectl)**: Installed and configured for local Minikube usage.
+- **.NET SDK**: Installed for running the C# application.
+
+## Running the Setup
+
+1. **Start Minikube and Enable the Tunnel**
+   Open a terminal, then start Minikube and set up the tunnel to allow access to your Kubernetes services.
 
    ```bash
-   docker-compose up -d
+   minikube start
+   minikube tunnel
    ```
 
-   This command will build and start the containers defined in the `docker-compose.yml` file.
+   > **Note**: The tunnel command must be kept running in a separate terminal while you are working with the services.
 
-3. **Verify Container Status:**
-   After the command has successfully executed, check if all the containers are running by executing:
+2. **Deploy the JanusGraph, Cassandra, and Elasticsearch Stack**
+   With the Minikube tunnel running, open a new terminal tab or window and deploy the required Kubernetes resources:
 
    ```bash
-   docker-compose ps
+   kubectl apply -f janusgraph-cassandra-elasticsearch.yaml
    ```
 
-   Ensure that all containers show a status of "Up." If any containers are not running, you may need to check the logs for troubleshooting.
-
-4. **Run the `MyJanusGraphApp` Project:**
-   Open a new terminal, navigate to the `MyJanusGraphApp` project directory. Then, run the following commands to build and run the application:
+3. **Verify Pods are Running**
+   After deploying, check that all pods are up and running:
 
    ```bash
+   kubectl get pods
+   ```
+
+   You should see output similar to the following:
+
+   ```
+   NAME                          READY   STATUS    RESTARTS   AGE
+   cassandra-0                   1/1     Running   0          13m
+   elasticsearch-0               1/1     Running   0          13m
+   janusgraph-7f84d455cd-hrtxp   1/1     Running   0          13m
+   ```
+
+   Ensure each pod status is "Running." If not, refer to the troubleshooting section below.
+
+4. **Access Services Locally**
+   To access the JanusGraph, Elasticsearch, and Cassandra services locally, use the following port-forwarding commands in a separate terminal window:
+
+   ```bash
+   kubectl port-forward service/janusgraph 8182:8182 &
+   kubectl port-forward service/elasticsearch 9200:9200 &
+   kubectl port-forward service/cassandra 9042:9042 &
+   ```
+
+5. **Run the .NET Application**
+   Navigate to the `MyJanusGraphApp` project directory and build and run the C# application:
+
+   ```bash
+   cd MyJanusGraphApp
    dotnet build
    dotnet run
    ```
 
-   If the query is successful, you will see the example result response from JanusGraph in the terminal.
+   If successful, the terminal will display a sample response from JanusGraph.
 
-5. **Stopping and Removing Containers (Optional):**
-   If you wish to stop and remove the containers after you are done, you can execute the following commands:
-
-   ```bash
-   docker-compose down
-   ```
-
-   This command will stop and remove the containers defined in the `docker-compose.yml` file.
-
-6. **List All Docker Containers:**
-   To see a list of all containers (including stopped ones), run:
+6. **Clean Up**
+   To delete the resources when finished, run:
 
    ```bash
-   docker ps -a
+   kubectl delete -f janusgraph-cassandra-elasticsearch.yaml
    ```
 
-7. **Remove Specific Containers (if needed):**
-   If you want to remove specific containers, you can use the following command, replacing `<Container ID>` with the actual ID of the container you want to remove:
+## Troubleshooting
+
+If you encounter issues during setup, here are some common solutions:
+
+### 1. Pods in "CrashLoopBackOff" or "OOMKilled" Status
+   If any pods (such as Cassandra or Elasticsearch) fail to start and show "CrashLoopBackOff" or "OOMKilled" statuses, it is likely due to insufficient memory.
+
+   **Solution**:
+   - Edit the `janusgraph-cassandra-elasticsearch.yaml` file to reduce the memory requirements for Cassandra and Elasticsearch:
+     ```yaml
+     env:
+       - name: MAX_HEAP_SIZE
+         value: "512M"
+       - name: HEAP_NEWSIZE
+         value: "100M"
+     ```
+
+   - For Elasticsearch, set:
+     ```yaml
+     env:
+       - name: ES_JAVA_OPTS
+         value: "-Xms512m -Xmx512m"
+     ```
+
+   - Reapply the changes:
+     ```bash
+     kubectl apply -f janusgraph-cassandra-elasticsearch.yaml
+     ```
+
+### 2. Unable to Connect to Services
+   If the application is unable to connect to JanusGraph or other services:
+   - Ensure all services are port-forwarded correctly.
+   - Verify that each service is accessible by using:
+     ```bash
+     curl http://localhost:8182  # JanusGraph
+     curl http://localhost:9200  # Elasticsearch
+     ```
+
+### 3. Checking Pod Logs
+   For further troubleshooting, view the logs of any failing pod to diagnose issues:
 
    ```bash
-   docker rm <Container ID>
+   kubectl logs <pod-name>
    ```
 
-   Note: Make sure the container is stopped before you attempt to remove it.
-
-### Additional Notes:
-- Ensure that Docker is installed and running on your machine before starting these steps.
-- If you encounter any errors, check the logs of the containers using `docker-compose logs` to troubleshoot.
-- You can always restart the containers using `docker-compose up -d` again after stopping them. 

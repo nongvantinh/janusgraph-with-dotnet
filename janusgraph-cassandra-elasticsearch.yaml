@@ -1,0 +1,173 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: janusgraph-config
+data:
+  CASSANDRA_CLUSTER_NAME: "JanusGraph Cluster"
+  CASSANDRA_SEEDS: "cassandra"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cassandra
+spec:
+  serviceName: "cassandra"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cassandra
+  template:
+    metadata:
+      labels:
+        app: cassandra
+    spec:
+      containers:
+      - name: cassandra
+        image: cassandra:4.0.6
+        env:
+        - name: MAX_HEAP_SIZE
+          value: "512M"
+        - name: HEAP_NEWSIZE
+          value: "100M"
+        - name: CASSANDRA_CLUSTER_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: janusgraph-config
+              key: CASSANDRA_CLUSTER_NAME
+        - name: CASSANDRA_SEEDS
+          valueFrom:
+            configMapKeyRef:
+              name: janusgraph-config
+              key: CASSANDRA_SEEDS
+        ports:
+        - containerPort: 9042
+          name: cql
+        resources:
+          requests:
+            memory: "500Mi"
+            cpu: "0.5"
+          limits:
+            memory: "1Gi"
+            cpu: "1"
+        volumeMounts:
+        - name: cassandra-data
+          mountPath: /var/lib/cassandra
+  volumeClaimTemplates:
+  - metadata:
+      name: cassandra-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cassandra
+spec:
+  clusterIP: None
+  ports:
+  - port: 9042
+    name: cql
+  selector:
+    app: cassandra
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+spec:
+  serviceName: "elasticsearch"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+    spec:
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.10.4
+        env:
+        - name: ES_JAVA_OPTS
+          value: "-Xms512m -Xmx512m"
+        - name: discovery.type
+          value: "single-node"
+        ports:
+        - containerPort: 9200
+          name: http
+        - containerPort: 9300
+          name: transport
+        resources:
+          requests:
+            memory: "500Mi"
+            cpu: "0.5"
+          limits:
+            memory: "1Gi"
+            cpu: "1"
+        volumeMounts:
+        - name: elasticsearch-data
+          mountPath: /usr/share/elasticsearch/data
+  volumeClaimTemplates:
+  - metadata:
+      name: elasticsearch-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+spec:
+  ports:
+  - port: 9200
+    name: http
+  selector:
+    app: elasticsearch
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: janusgraph
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: janusgraph
+  template:
+    metadata:
+      labels:
+        app: janusgraph
+    spec:
+      containers:
+      - name: janusgraph
+        image: janusgraph/janusgraph:1.0.0
+        env:
+        - name: STORAGE_BACKEND
+          value: "cql"
+        - name: STORAGE_HOSTNAME
+          value: "cassandra"
+        - name: INDEX_SEARCH
+          value: "elasticsearch"
+        - name: INDEX_HOSTS
+          value: "elasticsearch"
+        ports:
+        - containerPort: 8182
+          name: gremlin-server
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: janusgraph
+spec:
+  ports:
+  - port: 8182
+    name: gremlin-server
+  selector:
+    app: janusgraph
